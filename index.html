@@ -2129,80 +2129,84 @@
 
       showToast("💾 PDF 생성 중...");
 
-      // 1. Temporarily hide interactive-only elements on the REAL screen
-      const removeBtns = sheet.querySelectorAll('.remove-btn');
-      const emptyStates = sheet.querySelectorAll('.team-empty-state');
-      const selectedCards = sheet.querySelectorAll('.selected-team');
+      try {
+        // 1. Temporarily hide interactive-only elements on the REAL screen
+        const removeBtns = sheet.querySelectorAll('.remove-btn');
+        const emptyStates = sheet.querySelectorAll('.team-empty-state');
+        const selectedCards = sheet.querySelectorAll('.selected-team');
 
-      removeBtns.forEach(btn => btn.style.display = 'none');
-      emptyStates.forEach(el => { el.dataset.origText = el.innerText; el.innerText = ''; el.style.padding = '0'; });
-      selectedCards.forEach(card => card.classList.remove('selected-team'));
+        removeBtns.forEach(btn => btn.style.display = 'none');
+        emptyStates.forEach(el => { el.dataset.origText = el.innerText; el.innerText = ''; el.style.padding = '0'; });
+        selectedCards.forEach(card => card.classList.remove('selected-team'));
 
-      // Keep backup of original styles to restore later
-      const origBoxShadow = sheet.style.boxShadow;
-      const origBorder = sheet.style.border;
-      const origTransform = sheet.style.transform;
-      const origTransformOrigin = sheet.style.transformOrigin;
-      const origWidth = sheet.style.width;
+        // Keep backup of original styles to restore later
+        const origBoxShadow = sheet.style.boxShadow;
+        const origBorder = sheet.style.border;
+        const origTransform = sheet.style.transform;
+        const origTransformOrigin = sheet.style.transformOrigin;
+        const origWidth = sheet.style.width;
 
-      // 2. Capture the actual on-screen A4 sheet directly using html2canvas
-      requestAnimationFrame(() => {
-        html2canvas(sheet, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff'
-        }).then(function(canvas) {
-          // 3. Restore all elements and styles immediately after capture
-          removeBtns.forEach(btn => btn.style.display = '');
-          emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
-          selectedCards.forEach(card => card.classList.add('selected-team'));
-          
-          sheet.style.transform = origTransform;
-          sheet.style.transformOrigin = origTransformOrigin;
-          sheet.style.width = origWidth;
-          sheet.style.boxShadow = origBoxShadow;
-          sheet.style.border = origBorder;
+        // Resolve html2canvas and jsPDF from the window or html2pdf bundle namespace
+        const h2c = window.html2canvas || (window.html2pdf ? window.html2pdf.html2canvas : null);
+        const jspdfLib = window.jsPDF || (window.html2pdf ? window.html2pdf.jsPDF : null);
 
-          // 4. Resolve the jsPDF constructor from the loaded html2pdf bundle
-          let jsPDFConstructor = null;
-          if (typeof window.jsPDF === 'function') {
-            jsPDFConstructor = window.jsPDF;
-          } else if (window.jspdf && typeof window.jspdf.jsPDF === 'function') {
-            jsPDFConstructor = window.jspdf.jsPDF;
-          } else {
-            throw new Error("jsPDF constructor not found in loaded bundle.");
-          }
+        if (!h2c || !jspdfLib) {
+          throw new Error("PDF 렌더링 라이브러리를 찾을 수 없습니다.");
+        }
 
-          // 5. Create a single A4 page document
-          const pdf = new jsPDFConstructor({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
+        const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
+
+        // 2. Capture the actual on-screen A4 sheet directly using resolved html2canvas
+        requestAnimationFrame(() => {
+          h2c(sheet, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff'
+          }).then(function(canvas) {
+            // 3. Restore all elements and styles immediately after capture
+            removeBtns.forEach(btn => btn.style.display = '');
+            emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
+            selectedCards.forEach(card => card.classList.add('selected-team'));
+            
+            sheet.style.transform = origTransform;
+            sheet.style.transformOrigin = origTransformOrigin;
+            sheet.style.width = origWidth;
+            sheet.style.boxShadow = origBoxShadow;
+            sheet.style.border = origBorder;
+
+            // 4. Create a single A4 page document and draw the image (Strictly 1 Page)
+            const pdf = new jspdfLib({
+              orientation: 'portrait',
+              unit: 'mm',
+              format: 'a4'
+            });
+
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+            pdf.save(titleVal + '.pdf');
+
+            showToast("✅ PDF 다운로드 완료!");
+          }).catch(function(err) {
+            // Restore on error
+            removeBtns.forEach(btn => btn.style.display = '');
+            emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
+            selectedCards.forEach(card => card.classList.add('selected-team'));
+            
+            sheet.style.transform = origTransform;
+            sheet.style.transformOrigin = origTransformOrigin;
+            sheet.style.width = origWidth;
+            sheet.style.boxShadow = origBoxShadow;
+            sheet.style.border = origBorder;
+
+            console.error("PDF 에러:", err);
+            showToast("❌ PDF 변환 실패. Ctrl+P 인쇄를 이용해 주세요.");
           });
-
-          // 6. Draw the entire canvas exactly fitted to the 210mm x 297mm page (Strictly 1 Page)
-          const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-          pdf.save(titleVal + '.pdf');
-
-          showToast("✅ PDF 다운로드 완료!");
-        }).catch(function(err) {
-          // Restore on error too
-          removeBtns.forEach(btn => btn.style.display = '');
-          emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
-          selectedCards.forEach(card => card.classList.add('selected-team'));
-          
-          sheet.style.transform = origTransform;
-          sheet.style.transformOrigin = origTransformOrigin;
-          sheet.style.width = origWidth;
-          sheet.style.boxShadow = origBoxShadow;
-          sheet.style.border = origBorder;
-
-          console.error("PDF 에러:", err);
-          showToast("❌ PDF 변환 실패. Ctrl+P 인쇄를 이용해 주세요.");
         });
-      });
+      } catch (globalErr) {
+        console.error("PDF 글로벌 에러:", globalErr);
+        showToast("❌ PDF 변환 에러가 발생했습니다.");
+      }
     }
   </script>
 </body>
