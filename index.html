@@ -20,7 +20,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
 
-  <!-- html2pdf.js CDN -->
+  <!-- PDF Generation CDNs: html2canvas, jsPDF, and html2pdf -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <style>
@@ -508,7 +510,7 @@
       background-color: #ffffff;
       width: 210mm;
       min-height: 297mm;
-      padding: 5mm 10mm 8mm 10mm;
+      padding: 12mm 10mm 10mm 10mm; /* Increased top padding to 12mm for a comfortable top margin */
       box-shadow: 0 15px 35px rgba(15, 23, 42, 0.2);
       border: 1px solid #94a3b8;
       position: relative;
@@ -518,7 +520,7 @@
     }
 
     .a4-sheet-title-input {
-      font-size: 1.6rem;
+      font-size: 2.2rem; /* Increased size to make the document title prominent and fill vertical space */
       font-weight: 800;
       border: none;
       border-bottom: 2.5px solid transparent;
@@ -527,7 +529,7 @@
       padding: 0.25rem 0.5rem;
       width: 100%;
       text-align: center;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.8rem;
       transition: var(--transition);
     }
     .a4-sheet-title-input:focus {
@@ -549,7 +551,7 @@
         background-color: transparent;
         border: none;
       }
-      .a4-sheet {
+      .a4-sheet-container .a4-sheet {
         width: 100%;
         min-height: auto;
         padding: 1.25rem;
@@ -671,7 +673,7 @@
       display: grid;
       gap: 0.75rem;
       flex-grow: 1;
-      align-content: stretch;
+      align-content: stretch; /* Cards stretch vertically to fill the page height */
     }
     /* Dynamic column classes set by JS */
     .teams-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
@@ -707,8 +709,9 @@
       padding: 0.5rem 0.75rem;
       border-bottom: 1.5px solid var(--primary-dark);
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
+      position: relative; /* Anchor for absolute count badge */
       transition: var(--transition);
     }
 
@@ -719,9 +722,11 @@
       border: none;
       background: transparent;
       outline: none;
-      width: 65%;
+      width: 100px;
       padding: 0.1rem 0.25rem;
       border-radius: 0.25rem;
+      text-align: center;
+      margin: 0 auto; /* Keep centered */
     }
     .team-name-input:focus {
       background-color: white;
@@ -739,6 +744,10 @@
       display: inline-flex;
       gap: 0.25rem;
       align-items: center;
+      justify-content: center; /* Center content inside badge */
+      line-height: 1; /* Fix vertical alignment */
+      position: absolute; /* Place on the far right */
+      right: 0.75rem;
     }
     .team-card.dragover .team-count {
       background-color: var(--primary-dark);
@@ -1711,7 +1720,7 @@
         if (males > 0) dots += `<span class="gender-count-dot male" title="남학생 ${males}명"></span>`;
         if (females > 0) dots += `<span class="gender-count-dot female" title="여학생 ${females}명"></span>`;
 
-        countBadge.innerHTML = `${dots} ${team.members.length}명`;
+        countBadge.innerHTML = dots + `<span>${team.members.length}명</span>`;
 
 
 
@@ -2121,8 +2130,11 @@
     // PDF Generation
     // ----------------------------------------------------
     function downloadPDF() {
-      const sheet = document.getElementById('workspace-a4-sheet');
-      if (!sheet) {
+      const printTemplate = document.getElementById('a4-print-template');
+      printTemplate.innerHTML = "";
+
+      const originalSheet = document.getElementById('workspace-a4-sheet');
+      if (!originalSheet) {
         showToast("❌ 조 편성 화면을 찾을 수 없습니다.");
         return;
       }
@@ -2130,82 +2142,133 @@
       showToast("💾 PDF 생성 중...");
 
       try {
-        // 1. Temporarily hide interactive-only elements on the REAL screen
-        const removeBtns = sheet.querySelectorAll('.remove-btn');
-        const emptyStates = sheet.querySelectorAll('.team-empty-state');
-        const selectedCards = sheet.querySelectorAll('.selected-team');
+        // 1. Blur active element to remove blinking text cursors
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+          document.activeElement.blur();
+        }
 
-        removeBtns.forEach(btn => btn.style.display = 'none');
-        emptyStates.forEach(el => { el.dataset.origText = el.innerText; el.innerText = ''; el.style.padding = '0'; });
-        selectedCards.forEach(card => card.classList.remove('selected-team'));
+        // 2. Clone the on-screen sheet exactly
+        const sheetClone = originalSheet.cloneNode(true);
+        sheetClone.removeAttribute('id');
 
-        // Keep backup of original styles to restore later
-        const origBoxShadow = sheet.style.boxShadow;
-        const origBorder = sheet.style.border;
-        const origTransform = sheet.style.transform;
-        const origTransformOrigin = sheet.style.transformOrigin;
-        const origWidth = sheet.style.width;
+        // 3. Replace title input with a static div (avoids character overlap bug in html2canvas)
+        const titleInput = sheetClone.querySelector('.a4-sheet-title-input');
+        const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
+        if (titleInput) {
+          const titleDiv = document.createElement('div');
+          titleDiv.innerText = titleVal;
+          titleDiv.style.cssText = `
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            text-align: center;
+            margin-bottom: 0.8rem;
+            font-family: inherit;
+            padding: 0.25rem 0.5rem;
+            width: 100%;
+            box-sizing: border-box;
+          `;
+          titleInput.parentNode.replaceChild(titleDiv, titleInput);
+        }
+
+        // 4. Replace team name inputs with static spans (avoids input rendering bugs in html2canvas)
+        const clonedTeamInputs = sheetClone.querySelectorAll('.team-name-input');
+        const originalTeamInputs = originalSheet.querySelectorAll('.team-name-input');
+        clonedTeamInputs.forEach((input, idx) => {
+          const val = originalTeamInputs[idx] ? originalTeamInputs[idx].value.trim() : input.value.trim();
+          const span = document.createElement('span');
+          span.innerText = val;
+          span.style.cssText = `
+            font-size: 0.9rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            text-align: center;
+            width: 100px;
+            padding: 0.1rem 0.25rem;
+            font-family: inherit;
+            display: inline-block;
+          `;
+          input.parentNode.replaceChild(span, input);
+        });
+
+        // 5. Append to printTemplate offscreen for rendering and measurement
+        printTemplate.style.cssText = 'position: absolute; left: -9999px; top: 0; width: 210mm; overflow: visible;';
+        printTemplate.appendChild(sheetClone);
 
         // Resolve html2canvas and jsPDF from the window or html2pdf bundle namespace
         const h2c = window.html2canvas || (window.html2pdf ? window.html2pdf.html2canvas : null);
-        const jspdfLib = window.jsPDF || (window.html2pdf ? window.html2pdf.jsPDF : null);
+        const jspdfLib = window.jsPDF || (window.jspdf ? window.jspdf.jsPDF : null) || (window.html2pdf ? window.html2pdf.jsPDF : null);
 
         if (!h2c || !jspdfLib) {
           throw new Error("PDF 렌더링 라이브러리를 찾을 수 없습니다.");
         }
 
-        const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
-
-        // 2. Capture the actual on-screen A4 sheet directly using resolved html2canvas
         requestAnimationFrame(() => {
-          h2c(sheet, {
-            scale: 2,
-            useCORS: true,
-            logging: false,
-            backgroundColor: '#ffffff'
-          }).then(function(canvas) {
-            // 3. Restore all elements and styles immediately after capture
-            removeBtns.forEach(btn => btn.style.display = '');
-            emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
-            selectedCards.forEach(card => card.classList.add('selected-team'));
-            
-            sheet.style.transform = origTransform;
-            sheet.style.transformOrigin = origTransformOrigin;
-            sheet.style.width = origWidth;
-            sheet.style.boxShadow = origBoxShadow;
-            sheet.style.border = origBorder;
+          requestAnimationFrame(() => {
+            // Measure sheet dimensions at standard A4 sizing (210mm)
+            const sheetW = sheetClone.offsetWidth;
+            const sheetH = sheetClone.scrollHeight;
 
-            // 4. Create a single A4 page document and draw the image (Strictly 1 Page)
-            const pdf = new jspdfLib({
-              orientation: 'portrait',
-              unit: 'mm',
-              format: 'a4'
+            // Remove box-shadow and border from clone to render cleanly inside the PDF page
+            sheetClone.style.boxShadow = 'none';
+            sheetClone.style.border = 'none';
+
+            // 6. Capture the cloned sheet offscreen using resolved html2canvas
+            h2c(sheetClone, {
+              scale: 2.5, // High resolution crisp capture
+              useCORS: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0,
+              width: sheetW,
+              height: sheetH
+            }).then(function(canvas) {
+              printTemplate.innerHTML = "";
+
+              // 7. Create a single A4 page document (Strictly 1 Page)
+              const pdf = new jspdfLib({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+              });
+
+              // 8. Calculate dimensions preserving the exact aspect ratio (no squishing/stretching!)
+              const canvasW = canvas.width;
+              const canvasH = canvas.height;
+              const pdfMaxW = 210;
+              const pdfMaxH = 297;
+
+              let imgW = pdfMaxW;
+              let imgH = imgW * (canvasH / canvasW);
+
+              // If proportional height exceeds A4 height, scale down to fit height
+              if (imgH > pdfMaxH) {
+                imgH = pdfMaxH;
+                imgW = imgH * (canvasW / canvasH);
+              }
+
+              // Center the image inside the A4 page limits
+              const xOffset = (pdfMaxW - imgW) / 2;
+              const yOffset = (pdfMaxH - imgH) / 2;
+
+              const imgData = canvas.toDataURL('image/png');
+              
+              // Draw image on A4 page with aspect-ratio preservation offsets
+              pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgW, imgH);
+              pdf.save(titleVal + '.pdf');
+
+              showToast("✅ PDF 다운로드 완료!");
+            }).catch(function(err) {
+              printTemplate.innerHTML = "";
+              console.error("PDF 에러:", err);
+              showToast("❌ PDF 에러: " + (err.message || err));
             });
-
-            const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-            pdf.save(titleVal + '.pdf');
-
-            showToast("✅ PDF 다운로드 완료!");
-          }).catch(function(err) {
-            // Restore on error
-            removeBtns.forEach(btn => btn.style.display = '');
-            emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
-            selectedCards.forEach(card => card.classList.add('selected-team'));
-            
-            sheet.style.transform = origTransform;
-            sheet.style.transformOrigin = origTransformOrigin;
-            sheet.style.width = origWidth;
-            sheet.style.boxShadow = origBoxShadow;
-            sheet.style.border = origBorder;
-
-            console.error("PDF 에러:", err);
-            showToast("❌ PDF 변환 실패. Ctrl+P 인쇄를 이용해 주세요.");
           });
         });
       } catch (globalErr) {
         console.error("PDF 글로벌 에러:", globalErr);
-        showToast("❌ PDF 변환 에러가 발생했습니다.");
+        showToast("❌ PDF 에러: " + (globalErr.message || globalErr));
       }
     }
   </script>
