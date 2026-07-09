@@ -2139,7 +2139,7 @@
         card.classList.remove('selected-team');
       });
 
-      // Match the exact same styling as the on-screen A4 sheet
+      // 2. Set identical font family and styling to match screen exactly
       sheetClone.style.cssText = `
         background: #ffffff;
         width: 210mm;
@@ -2152,41 +2152,36 @@
         border: none;
         margin: 0;
         position: relative;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
       `;
 
-      // 2. Replace title input with static text
-      const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
-      const titleInput = sheetClone.querySelector('.a4-sheet-title-input');
-      if (titleInput) {
-        const titleDiv = document.createElement('div');
-        titleDiv.innerText = titleVal;
-        titleDiv.style.cssText = `
-          font-size: 1.6rem; font-weight: 800; color: #047857;
-          text-align: center; margin-bottom: 0.5rem;
-          font-family: 'Pretendard Variable', 'Noto Sans KR', sans-serif;
-        `;
-        titleInput.parentNode.replaceChild(titleDiv, titleInput);
-      }
-
-      // 3. Replace team name inputs with static text
-      const clonedTeamInputs = sheetClone.querySelectorAll('.team-name-input');
-      const realTeamInputs = document.querySelectorAll('.team-name-input');
-      clonedTeamInputs.forEach((input, idx) => {
-        const val = realTeamInputs[idx] ? realTeamInputs[idx].value.trim() : input.value.trim();
-        const span = document.createElement('span');
-        span.innerText = val;
-        span.style.cssText = `font-size: 0.9rem; font-weight: 800; color: #047857;`;
-        input.parentNode.replaceChild(span, input);
+      // 3. Keep input elements but make them look like static text (borderless)
+      // and explicitly set value attributes so html2canvas renders them correctly
+      const clonedInputs = sheetClone.querySelectorAll('input');
+      const originalInputs = originalSheet.querySelectorAll('input');
+      clonedInputs.forEach((input, idx) => {
+        const val = originalInputs[idx] ? originalInputs[idx].value : input.value;
+        input.setAttribute('value', val);
+        input.value = val;
+        
+        // Remove borders and backgrounds to look like text, but keep layout sizing
+        input.style.border = "none";
+        input.style.background = "transparent";
+        input.style.outline = "none";
+        input.style.boxShadow = "none";
+        input.style.fontFamily = "inherit";
+        input.style.textAlign = "center";
+        input.readOnly = true;
       });
 
-      // 4. Remove interactive elements
+      // 4. Remove interactive elements (× buttons)
       sheetClone.querySelectorAll('.remove-btn').forEach(btn => btn.remove());
       sheetClone.querySelectorAll('.team-empty-state').forEach(el => {
         el.innerText = '';
         el.style.padding = '0';
       });
 
-      // 5. Add print footer
+      // 5. Append print footer at the bottom
       const footer = document.createElement('div');
       footer.style.cssText = `
         display: flex; justify-content: space-between;
@@ -2194,15 +2189,20 @@
         border-top: 1px solid #e5e7eb;
         padding-top: 5px; margin-top: auto;
         flex-shrink: 0; width: 100%;
+        font-family: inherit;
       `;
+      const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
       footer.innerHTML = '<span>오늘의 조 편성</span><span>' +
         new Date().toLocaleDateString('ko-KR') + ' ' +
         new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) +
         '</span>';
       sheetClone.appendChild(footer);
 
-      // 6. Offscreen placement for measurement
-      printTemplate.style.cssText = 'position:absolute; left:-9999px; top:0; width:210mm; overflow:visible;';
+      // 6. Offscreen placement for measurement with explicit font inheritance
+      printTemplate.style.cssText = `
+        position: absolute; left: -9999px; top: 0; width: 210mm; overflow: visible;
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      `;
       printTemplate.appendChild(sheetClone);
 
       showToast("💾 PDF 생성 중...");
@@ -2219,7 +2219,10 @@
           }
 
           const wrapper = document.createElement('div');
-          wrapper.style.cssText = 'width:210mm; height:297mm; overflow:hidden; background:#fff; position:relative;';
+          wrapper.style.cssText = `
+            width: 210mm; height: 297mm; overflow: hidden; background: #fff; position: relative;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+          `;
 
           printTemplate.removeChild(sheetClone);
 
