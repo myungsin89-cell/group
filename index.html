@@ -1,0 +1,2256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오늘의 조 편성</title>
+  
+  <!-- SEO & PWA Theme Color -->
+  <meta name="theme-color" content="#f7f9f6">
+  <meta name="description" content="학생 명단을 바탕으로 쉽고 편리하게 조를 짜고 A4 용지 크기로 깔끔하게 출력/PDF 저장하는 PWA 웹 앱입니다.">
+  
+  <!-- Web App Manifest & Service Worker Registration -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <!-- Google Fonts: Outfit & Pretendard CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+
+  <!-- html2pdf.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    /* Design Tokens & Theme Variables */
+    :root {
+      --bg-color: #f7f9f6;
+      --card-bg: #ffffff;
+      --primary: #10b981;
+      --primary-hover: #059669;
+      --primary-dark: #047857;
+      --primary-light: #e6f4ea;
+      --accent-green: #34d399;
+      --text-main: #1f2937;
+      --text-muted: #4b5563;
+      --text-green: #064e3b;
+      --border-color: #e5e7eb;
+      --border-green: #d1fae5;
+      
+      /* Gender Accent Colors */
+      --male-bg: #f0f7ff;
+      --male-border: #bfdbfe;
+      --male-text: #1d4ed8;
+      --male-badge: #dbeafe;
+      
+      --female-bg: #fdf2f8;
+      --female-border: #fbcfe8;
+      --female-text: #be185d;
+      --female-badge: #fce7f3;
+
+      --neutral-bg: #f9fafb;
+      --neutral-border: #e5e7eb;
+      --neutral-text: #4b5563;
+      --neutral-badge: #f3f4f6;
+
+      --shadow-sm: 0 2px 4px 0 rgba(16, 185, 129, 0.02);
+      --shadow-md: 0 4px 12px -2px rgba(16, 185, 129, 0.06), 0 2px 6px -1px rgba(16, 185, 129, 0.03);
+      --shadow-lg: 0 12px 24px -4px rgba(16, 185, 129, 0.08), 0 4px 12px -2px rgba(16, 185, 129, 0.04);
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: var(--transition);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #d1d5db;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #9ca3af;
+    }
+
+    /* Header Container */
+    header {
+      background-color: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: var(--transition);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+    }
+
+    .logo-icon {
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 0.5rem;
+      background-color: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    h1 {
+      font-family: 'Outfit', 'Pretendard', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      letter-spacing: -0.025em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    /* Base Buttons */
+    button {
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 600;
+      padding: 0.55rem 1.1rem;
+      border-radius: 0.5rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: var(--transition);
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background-color: var(--card-bg);
+      color: var(--text-muted);
+      border-color: var(--border-color);
+    }
+    .btn-secondary:hover {
+      background-color: #f9fafb;
+      color: var(--text-main);
+      border-color: #d1d5db;
+    }
+
+    .btn-accent {
+      background-color: var(--primary-light);
+      color: var(--primary-dark);
+    }
+    .btn-accent:hover {
+      background-color: #d1fae5;
+    }
+
+    .btn-danger {
+      background-color: #fee2e2;
+      color: #b91c1c;
+    }
+    .btn-danger:hover {
+      background-color: #fecaca;
+    }
+
+    .btn-icon-only {
+      padding: 0.55rem;
+      aspect-ratio: 1;
+    }
+
+    /* View Wrappers */
+    .view-container {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 2rem 1.5rem;
+    }
+
+    /* ----------------------------------------------------
+       Home View Style
+    ---------------------------------------------------- */
+    .home-hero {
+      text-align: center;
+      margin: 3.5rem 0 2rem;
+      animation: fadeIn 0.6s ease-out;
+    }
+    .home-hero-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      display: inline-block;
+      animation: bounceSoft 3s infinite ease-in-out;
+    }
+    .home-hero h2 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      margin-bottom: 0.5rem;
+    }
+    .home-hero p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .home-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+      margin-bottom: 3.5rem;
+      max-width: 900px;
+      width: 100%;
+      margin-left: auto;
+      margin-right: auto;
+      animation: fadeInUp 0.7s ease-out;
+    }
+
+    @media (max-width: 768px) {
+      .home-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+      }
+    }
+
+    .home-card {
+      background-color: var(--card-bg);
+      border-radius: 1.5rem;
+      border: 1px solid var(--border-color);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.25rem;
+      transition: var(--transition);
+    }
+    .home-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-lg);
+    }
+    .home-card-icon {
+      width: 4rem;
+      height: 4rem;
+      border-radius: 1.25rem;
+      background-color: var(--primary-light);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: var(--primary-dark);
+      transition: var(--transition);
+    }
+    .home-card:hover .home-card-icon {
+      background-color: var(--primary);
+      color: white;
+    }
+    .home-card h3 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .home-card p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .home-stats {
+      background-color: var(--card-bg);
+      border-radius: 1rem;
+      padding: 1.25rem 2rem;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      width: 100%;
+    }
+    .home-stats strong {
+      color: var(--primary-dark);
+    }
+
+    /* ----------------------------------------------------
+       Roster Settings View Style ( Roster Manager )
+    ---------------------------------------------------- */
+    .roster-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    .roster-grid {
+      display: grid;
+      grid-template-columns: 450px 1fr;
+      gap: 2rem;
+    }
+    @media (max-width: 1024px) {
+      .roster-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .roster-input-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .roster-textarea {
+      width: 100%;
+      height: 280px;
+      border-radius: 0.75rem;
+      border: 1px solid var(--border-color);
+      padding: 1rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      background-color: #fafbfc;
+      transition: var(--transition);
+    }
+    .roster-textarea:focus {
+      border-color: var(--primary);
+      background-color: white;
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+    }
+
+    .roster-preview-table-container {
+      background-color: var(--card-bg);
+      border-radius: 1rem;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 550px;
+    }
+
+    .roster-table-header {
+      padding: 1rem 1.5rem;
+      background-color: #f9fafb;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .roster-table-scroll {
+      overflow-y: auto;
+      flex-grow: 1;
+    }
+
+    .roster-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    .roster-table th, .roster-table td {
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .roster-table th {
+      background-color: #f3f4f6;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .roster-table tr:hover {
+      background-color: #fcfdfc;
+    }
+
+    /* ----------------------------------------------------
+       Workspace View & Virtual A4 Sheet Style
+    ---------------------------------------------------- */
+    .workspace-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    @media (max-width: 1200px) {
+      .workspace-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .workspace-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: sticky;
+      top: 5rem;
+    }
+
+    .canvas-card {
+      background-color: var(--card-bg);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-md);
+      transition: var(--transition);
+    }
+    
+    .panel-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .workspace-header {
+      background-color: var(--card-bg);
+      border-radius: 1rem;
+      padding: 1rem 1.5rem;
+      border: 1px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .workspace-title-section {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-grow: 1;
+    }
+    
+    .workspace-meta {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      background-color: var(--primary-light);
+      padding: 0.45rem 1rem;
+      border-radius: 2rem;
+      border: 1px solid var(--border-green);
+      display: inline-flex;
+      align-items: center;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Virtual A4 Sheet Preview Styling */
+    .a4-sheet-container {
+      background-color: #cbd5e1; /* Contrast background for paper sheet */
+      border-radius: 1.25rem;
+      padding: 2.5rem;
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      border: 1px solid #94a3b8;
+    }
+
+    .a4-sheet {
+      background-color: #ffffff;
+      width: 210mm;
+      min-height: 297mm;
+      padding: 5mm 10mm 8mm 10mm;
+      box-shadow: 0 15px 35px rgba(15, 23, 42, 0.2);
+      border: 1px solid #94a3b8;
+      position: relative;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .a4-sheet-title-input {
+      font-size: 1.6rem;
+      font-weight: 800;
+      border: none;
+      border-bottom: 2.5px solid transparent;
+      outline: none;
+      color: var(--primary-dark);
+      padding: 0.25rem 0.5rem;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 0.5rem;
+      transition: var(--transition);
+    }
+    .a4-sheet-title-input:focus {
+      border-bottom-color: var(--primary);
+      background-color: #f0fdf4;
+    }
+
+    .a4-sheet-bar {
+      height: 4px;
+      background-color: var(--primary-dark);
+      margin-bottom: 1.5rem;
+      border-radius: 2px;
+    }
+
+    /* Responsive scaling for A4 sheet on tablets & mobile */
+    @media (max-width: 1024px) {
+      .a4-sheet-container {
+        padding: 1rem;
+        background-color: transparent;
+        border: none;
+      }
+      .a4-sheet {
+        width: 100%;
+        min-height: auto;
+        padding: 1.25rem;
+        box-shadow: var(--shadow-lg);
+        border-radius: 0.75rem;
+      }
+    }
+
+    .waiting-list-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px dashed var(--border-color);
+      border-radius: 0.75rem;
+      padding: 0.75rem;
+      background-color: #fafbfc;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-content: flex-start;
+      justify-content: center;
+      min-height: 100px;
+      transition: var(--transition);
+    }
+    .waiting-list-container.dragover {
+      background-color: var(--primary-light);
+      border-color: var(--primary);
+    }
+
+    /* Student Cards Design (Gender Highlighted) */
+    .student-card {
+      border-radius: 0.5rem;
+      padding: 0.4rem 0.5rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: grab;
+      user-select: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      width: 102px; /* Fixed width to prevent shrinking for single-character names */
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+      flex-shrink: 0;
+    }
+    
+    /* Gender classes */
+    .student-card.gender-male {
+      background-color: var(--male-bg);
+      border: 1px solid var(--male-border);
+      color: var(--male-text);
+    }
+    .student-card.gender-female {
+      background-color: var(--female-bg);
+      border: 1px solid var(--female-border);
+      color: var(--female-text);
+    }
+    .student-card.gender-none {
+      background-color: var(--neutral-bg);
+      border: 1px solid var(--neutral-border);
+      color: var(--neutral-text);
+    }
+
+    .student-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 8px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .student-card.dragging {
+      opacity: 0.4;
+      cursor: grabbing;
+    }
+
+    .student-card.selected {
+      box-shadow: 0 0 0 2.5px var(--accent-green);
+      transform: scale(1.03);
+    }
+
+    .student-num-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.1rem 0.35rem;
+      border-radius: 0.25rem;
+    }
+    .gender-male .student-num-badge {
+      background-color: var(--male-badge);
+    }
+    .gender-female .student-num-badge {
+      background-color: var(--female-badge);
+    }
+    .gender-none .student-num-badge {
+      background-color: var(--neutral-badge);
+    }
+
+    .student-card .remove-btn {
+      color: #9ca3af;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      font-size: 0.75rem;
+      transition: var(--transition);
+    }
+    .student-card .remove-btn:hover {
+      background-color: #fee2e2;
+      color: #ef4444;
+    }
+
+    /* Teams Grid Canvas inside A4 Sheet */
+    .teams-grid {
+      display: grid;
+      gap: 0.75rem;
+      flex-grow: 1;
+      align-content: stretch;
+    }
+    /* Dynamic column classes set by JS */
+    .teams-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .teams-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .teams-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+    .team-card {
+      background-color: var(--card-bg);
+      border-radius: 0.75rem;
+      border: 1.5px solid var(--primary-dark);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: var(--transition);
+    }
+    .team-card.selected-team {
+      border: 3px solid var(--accent-green) !important;
+      box-shadow: 0 8px 22px rgba(16, 185, 129, 0.35) !important;
+      transform: translateY(-2px) scale(1.015);
+    }
+    .team-card.selected-team .team-header {
+      background: linear-gradient(135deg, #d1fae5, #a7f3d0) !important;
+    }
+    .team-card.dragover {
+      background-color: var(--primary-light);
+      border-color: var(--accent-green);
+      box-shadow: 0 0 0 2.5px rgba(16, 185, 129, 0.15);
+    }
+
+    .team-header {
+      background-color: var(--primary-light);
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1.5px solid var(--primary-dark);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: var(--transition);
+    }
+
+    .team-name-input {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: var(--primary-dark);
+      border: none;
+      background: transparent;
+      outline: none;
+      width: 65%;
+      padding: 0.1rem 0.25rem;
+      border-radius: 0.25rem;
+    }
+    .team-name-input:focus {
+      background-color: white;
+      box-shadow: 0 0 0 2px var(--accent-green);
+    }
+
+    .team-count {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+      background-color: white;
+      border: 1px solid var(--primary-dark);
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.75rem;
+      display: inline-flex;
+      gap: 0.25rem;
+      align-items: center;
+    }
+    .team-card.dragover .team-count {
+      background-color: var(--primary-dark);
+      color: white;
+    }
+
+    .team-dropzone {
+      padding: 0.75rem;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      background-color: #ffffff;
+      transition: var(--transition);
+      align-content: flex-start;
+    }
+    .team-dropzone .student-card {
+      width: 100% !important;
+      justify-content: space-between;
+    }
+
+    .team-empty-state {
+      margin: auto;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      pointer-events: none;
+      text-align: center;
+      padding: 1.5rem 0.5rem;
+    }
+
+    /* ----------------------------------------------------
+       Modal Window Styling
+    ---------------------------------------------------- */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-backdrop.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background-color: var(--card-bg);
+      border-radius: 1.25rem;
+      width: 90%;
+      max-width: 500px;
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      transform: translateY(20px);
+      transition: transform 0.25s ease;
+      border: 1px solid var(--border-color);
+    }
+    .modal-backdrop.show .modal {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--primary-light);
+    }
+    .modal-header h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--primary-dark);
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      line-height: 1;
+      cursor: pointer;
+      color: var(--primary-dark);
+      opacity: 0.7;
+    }
+    .modal-close:hover {
+      opacity: 1;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      background-color: #f9fafb;
+    }
+
+    .form-group-radio {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .form-group-radio label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    .form-input {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--border-color);
+      border-radius: 0.5rem;
+      font-family: inherit;
+      outline: none;
+      font-size: 0.9rem;
+    }
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    /* Notification / Toast */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background-color: var(--primary-dark);
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.5rem;
+      box-shadow: var(--shadow-lg);
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s;
+      z-index: 2000;
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* PWA Install Promo Banner */
+    .install-promo {
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: white;
+      padding: 1rem 1.5rem;
+      border-radius: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-md);
+      display: none; /* Controlled by JS */
+    }
+    .install-promo-text h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .install-promo-text p {
+      font-size: 0.8rem;
+      opacity: 0.9;
+    }
+    .install-promo-btn {
+      background-color: white;
+      color: var(--primary-dark);
+      padding: 0.4rem 0.8rem;
+      border-radius: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+    .install-promo-btn:hover {
+      background-color: var(--primary-light);
+    }
+
+    /* Help Guideline UI */
+    .help-tooltip {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+      line-height: 1.5;
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes bounceSoft {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    /* A4 Print layout container (Hidden in screen mode, styled specifically for PDF/Print) */
+    #a4-print-template {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      width: 210mm;
+      height: 297mm;
+      overflow: hidden;
+    }
+
+    /* Print Stylesheet */
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        font-size: 11pt !important;
+      }
+      header, .view-container, .toast, .modal-backdrop {
+        display: none !important;
+      }
+      #a4-print-template {
+        position: static !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="logo-container" onclick="navigateHome()">
+      <div class="logo-icon">🍀</div>
+      <div>
+        <h1>오늘의 조 편성</h1>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-secondary" onclick="navigateRoster()">
+        ⚙️ 명단 설정
+      </button>
+    </div>
+  </header>
+
+  <!-- PWA Install Banner (Promo) -->
+  <div class="app-container" style="margin-top: 1rem; margin-bottom: -1rem; max-width: 1400px; width: 100%; padding: 0 1.5rem; margin-left: auto; margin-right: auto;">
+    <div id="pwa-promo-banner" class="install-promo" style="width: 100%;">
+      <div class="install-promo-text">
+        <h4>오늘의 조 편성 앱을 설치하여 편리하게 이용해 보세요!</h4>
+        <p>바탕화면에 단축 아이콘이 생성되어, 인터넷 연결 상태에 구애받지 않고 언제든지 바로 구동할 수 있습니다.</p>
+      </div>
+      <button class="install-promo-btn" onclick="triggerPwaInstall()">앱 설치</button>
+    </div>
+  </div>
+
+  <!-- ----------------------------------------------------
+       Home View HTML (Restructured: 2 Hero Buttons)
+  ---------------------------------------------------- -->
+  <div id="home-view" class="view-container">
+    <div class="home-hero">
+      <span class="home-hero-icon">🍀</span>
+      <h2>스마트 조 편성 도우미</h2>
+      <p>A4 게시판 게시에 특화된 맞춤 레이아웃으로 편리하게 조를 나누고 인쇄할 수 있습니다.</p>
+    </div>
+
+    <!-- Stats summary -->
+    <div class="home-stats">
+      <div>📋 등록된 명단 학생 수: <strong id="stats-roster-count">0명</strong></div>
+      <div>💾 저장된 조 편성표: <strong id="stats-saved-count">0개</strong></div>
+    </div>
+
+    <!-- Home Actions Grid -->
+    <div class="home-grid">
+      <!-- Create Grouping Card -->
+      <div class="home-card" onclick="openSetupModal()">
+        <div class="home-card-icon">➕</div>
+        <h3>조 생성하기</h3>
+        <p>현재 설정된 학생 명단을 기준으로 조 개수 또는 목표 인원수를 설정하여 새로운 조 편성을 시작합니다.</p>
+      </div>
+
+      <!-- Load Grouping Card -->
+      <div class="home-card" onclick="openSavedModal()">
+        <div class="home-card-icon">📂</div>
+        <h3>조 불러오기</h3>
+        <p>이전에 완성하여 브라우저에 임시 또는 영구 저장해 둔 조 편성 결과를 다시 불러옵니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ----------------------------------------------------
+       Roster Settings View HTML (Roster input)
+  ---------------------------------------------------- -->
+  <div id="roster-view" class="view-container hidden">
+    <div class="roster-header">
+      <h2 style="color: var(--primary-dark); font-weight:800; display:flex; align-items:center; gap:0.5rem;">
+        ⚙️ 학생 명단 관리
+      </h2>
+      <button class="btn-secondary" onclick="navigateHome()">↩️ 메인으로 가기</button>
+    </div>
+
+    <div class="roster-grid">
+      <!-- Input panel -->
+      <div class="roster-input-panel">
+        <div class="canvas-card">
+          <h3 class="panel-title" style="margin-bottom: 0.5rem;">학생 명단 입력</h3>
+          <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:1rem; line-height: 1.5;">
+            엑셀이나 한글 출석부의 <strong>[번호 이름 성별]</strong> 데이터를 일괄 복사하여 붙여넣으세요.<br>
+            성별 정보(남/여)가 포함되면 자동 파싱되며, 누락된 번호나 성별 정보는 자동 보정됩니다.
+          </p>
+          <textarea id="roster-bulk-input" class="roster-textarea" placeholder="입력 예시:&#10;1 김철수 남&#10;2 이영희 여&#10;3 박민수 남&#10;4 성춘향 여&#10;5 이도령"></textarea>
+          
+          <div class="action-grid" style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+            <button class="btn-primary" style="flex-grow: 1;" onclick="processBulkRoster()">명단 분석 및 반영</button>
+            <button class="btn-secondary" onclick="clearBulkRosterInput()">비우기</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview list -->
+      <div class="roster-preview-table-container">
+        <div class="roster-table-header">
+          <span>명단 분석 결과 <span class="count-badge" id="roster-preview-count">총 0명</span></span>
+          <div style="display: flex; gap: 0.5rem;">
+            <button class="btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;" onclick="saveRoster()">💾 설정 완료 및 저장</button>
+            <button class="btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;" onclick="clearSavedRoster()">전체 삭제</button>
+          </div>
+        </div>
+        <div class="roster-table-scroll">
+          <table class="roster-table">
+            <thead>
+              <tr>
+                <th style="width: 80px;">번호</th>
+                <th>이름</th>
+                <th style="width: 120px;">성별 구분</th>
+                <th style="width: 80px;">관리</th>
+              </tr>
+            </thead>
+            <tbody id="roster-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ----------------------------------------------------
+       Workspace View HTML (With Virtual A4 Sheet)
+  ---------------------------------------------------- -->
+  <div id="workspace-view" class="view-container hidden">
+    <!-- Toolbar -->
+    <div class="workspace-header">
+      <div class="workspace-title-section">
+        <span class="workspace-meta" id="workspace-summary">총 0명 · 조 0개</span>
+      </div>
+      
+      <div class="header-actions">
+        <button class="btn-primary" onclick="saveCurrentWorkspaceConfig()">
+          💾 현재 편성 저장
+        </button>
+        <button class="btn-secondary" onclick="downloadPDF()">
+          🖨️ PDF 다운로드 (A4)
+        </button>
+      </div>
+    </div>
+
+    <!-- Workspace Layout -->
+    <div class="workspace-layout">
+      <!-- Left side: Waiting List -->
+      <div class="workspace-sidebar">
+        <div class="canvas-card">
+          <h2 class="panel-title">
+            대기 학생 목록
+            <span class="count-badge" id="workspace-waiting-count">0명</span>
+          </h2>
+          
+          <div id="workspace-waiting-list" class="waiting-list-container" ondragover="allowDrop(event)" ondragleave="handleDragLeave(event)" ondrop="dropToWaiting(event)">
+            <!-- Cards populated dynamically -->
+          </div>
+
+          <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+            <button class="btn-accent" onclick="randomlyAssignAll()" style="font-weight: 700;">
+              미배치 학생 랜덤 배치
+            </button>
+            <button class="btn-secondary" onclick="clearWorkspaceTeamsOnly()">
+              초기화
+            </button>
+          </div>
+          
+          <div class="help-tooltip">
+            <strong style="color: var(--primary-dark); display: block; margin-bottom: 0.25rem;">💡 빠른 배정 방법 (추천)</strong>
+            조 카드를 클릭해 선택(녹색 테두리)한 후, 대기 학생을 클릭하면 즉시 배정됩니다. (배정 취소는 조 안의 학생 클릭)
+          </div>
+        </div>
+      </div>
+
+      <!-- Right side: Virtual A4 Sheet (Clear page separation) -->
+      <div class="a4-sheet-container">
+        <div id="workspace-a4-sheet" class="a4-sheet">
+          <!-- Title on Paper -->
+          <input type="text" id="workspace-title" class="a4-sheet-title-input" value="오늘의 조 편성" placeholder="조 편성 제목을 입력하세요." oninput="updateWorkspaceTitle(this.value)">
+          
+          <!-- Separation Ribbon -->
+          <div class="a4-sheet-bar"></div>
+
+          <!-- Group cards container on Paper -->
+          <div id="workspace-teams-container" class="teams-grid">
+            <!-- Team cards populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ----------------------------------------------------
+       Modals & Popups
+  ---------------------------------------------------- -->
+
+  <!-- 1. Create Grouping Setup Modal -->
+  <div id="setup-modal" class="modal-backdrop" onclick="closeSetupModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>새로운 조 편성하기</h3>
+        <button class="modal-close" onclick="closeSetupModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" style="font-weight: 700;">조 편성 제목</label>
+          <input type="text" id="setup-title-input" class="form-input" value="오늘의 조 편성">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-weight: 700;">조 생성 방식 설정</label>
+          <div class="form-group-radio">
+            <label>
+              <input type="radio" name="setup-criteria" value="team-count" checked onchange="toggleSetupCriteriaInput()">
+              조 개수 기준
+            </label>
+            <label>
+              <input type="radio" name="setup-criteria" value="member-count" onchange="toggleSetupCriteriaInput()">
+              한 조당 인원수 기준
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="setup-criteria-count-group" style="margin-bottom: 1rem;">
+          <label class="form-label" id="setup-criteria-label" style="font-weight: 700;">생성할 조 개수</label>
+          <input type="number" id="setup-criteria-value" class="form-input" value="4" min="1" max="50">
+          <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.4rem;" id="setup-helper-text">
+            총 조 개수를 고정하여 조를 만듭니다.
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeSetupModal()">취소</button>
+        <button class="btn-primary" onclick="startGroupingWorkspace()">조 생성 및 시작</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Saved Configurations Modal -->
+  <div id="saved-modal" class="modal-backdrop" onclick="closeSavedModal()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3>저장된 조 편성 목록</h3>
+        <button class="modal-close" onclick="closeSavedModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="saved-list" class="saved-list">
+          <!-- Dynamic configs -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeSavedModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast-notification" class="toast">
+    <span id="toast-message">알림 메시지</span>
+  </div>
+
+  <!-- Hidden Custom A4 Print Area for PDF conversion to ensure a single perfect page -->
+  <div id="a4-print-template">
+    <!-- Styled dynamically during print/PDF generation -->
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    // Global States
+    let activeRoster = []; // Loaded from 'team_maker_roster'
+    let savedConfigs = []; // Loaded from 'team_maker_saved_configs'
+    let rosterPreviewList = []; // Temp roster state inside settings screen
+
+    // Workspace ongoing state
+    let workspaceState = {
+      title: "오늘의 조 편성",
+      waiting: [],
+      teams: []
+    };
+
+    // UI helper for click-to-move
+    let selectedStudent = null;
+    let selectedTeamIndex = null;
+
+    // Window Init
+    window.addEventListener('DOMContentLoaded', () => {
+      loadRosterFromStorage();
+      loadSavedConfigsFromStorage();
+      updateHomeStats();
+
+      // Restore workspace state if there was an ongoing one
+      const ongoing = localStorage.getItem('team_maker_workspace_ongoing');
+      if (ongoing) {
+        try {
+          workspaceState = JSON.parse(ongoing);
+          navigateWorkspace();
+        } catch (e) {
+          localStorage.removeItem('team_maker_workspace_ongoing');
+        }
+      }
+
+      // PWA service worker enrollment
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./service-worker.js')
+          .then(reg => console.log('Service Worker Registered!', reg))
+          .catch(err => console.log('SW Registration Failed!', err));
+      }
+    });
+
+    // PWA Install Prompt Listener
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      document.getElementById('pwa-promo-banner').style.display = 'flex';
+    });
+
+    window.addEventListener('appinstalled', () => {
+      showToast("🎉 조짜는 앱 설치가 완료되었습니다!");
+      document.getElementById('pwa-promo-banner').style.display = 'none';
+    });
+
+    function triggerPwaInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            console.log('PWA installation completed');
+          }
+          deferredPrompt = null;
+        });
+      }
+    }
+
+    // SPA Navigation Logic
+    function hideAllViews() {
+      document.getElementById('home-view').classList.add('hidden');
+      document.getElementById('roster-view').classList.add('hidden');
+      document.getElementById('workspace-view').classList.add('hidden');
+    }
+
+    function navigateHome() {
+      hideAllViews();
+      document.getElementById('home-view').classList.remove('hidden');
+      updateHomeStats();
+      selectedStudent = null;
+    }
+
+    function navigateRoster() {
+      hideAllViews();
+      document.getElementById('roster-view').classList.remove('hidden');
+      
+      // Load active roster into textarea
+      let text = "";
+      activeRoster.forEach(s => {
+        text += `${s.number} ${s.name} ${s.gender || ''}\n`;
+      });
+      document.getElementById('roster-bulk-input').value = text;
+      
+      rosterPreviewList = JSON.parse(JSON.stringify(activeRoster));
+      renderRosterPreviewTable();
+    }
+
+    function navigateWorkspace() {
+      hideAllViews();
+      document.getElementById('workspace-view').classList.remove('hidden');
+      document.getElementById('workspace-title').value = workspaceState.title;
+      selectedStudent = null;
+      selectedTeamIndex = null;
+      renderWorkspace();
+    }
+
+    function updateHomeStats() {
+      document.getElementById('stats-roster-count').innerText = `${activeRoster.length}명`;
+      document.getElementById('stats-saved-count').innerText = `${savedConfigs.length}개`;
+    }
+
+    function loadRosterFromStorage() {
+      const stored = localStorage.getItem('team_maker_roster');
+      if (stored) {
+        try {
+          activeRoster = JSON.parse(stored);
+        } catch (e) {
+          activeRoster = [];
+        }
+      }
+    }
+
+    function loadSavedConfigsFromStorage() {
+      const stored = localStorage.getItem('team_maker_saved_configs');
+      if (stored) {
+        try {
+          savedConfigs = JSON.parse(stored);
+        } catch (e) {
+          savedConfigs = [];
+        }
+      }
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast-notification');
+      document.getElementById('toast-message').innerText = message;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    // ----------------------------------------------------
+    // Student Roster Parsing & Management
+    // ----------------------------------------------------
+    function parseRosterText(text) {
+      const lines = text.split('\n');
+      const parsed = [];
+      let defaultNumber = 1;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        const parts = trimmed.split(/\s+/);
+        if (parts.length === 0) return;
+
+        let number = "";
+        let name = "";
+        let gender = "";
+
+        // 1. First column is attendance number digits
+        if (/^\d+$/.test(parts[0])) {
+          number = parts[0];
+          parts.shift();
+        }
+
+        // 2. Last column is gender indicator
+        if (parts.length > 0) {
+          const lastPart = parts[parts.length - 1];
+          if (['남', '여', '남성', '여성', 'M', 'F', 'male', 'female', '남자', '여자'].includes(lastPart)) {
+            const gVal = lastPart.toLowerCase();
+            if (['남', '남성', 'm', 'male', '남자'].includes(gVal)) {
+              gender = '남';
+            } else if (['여', '여성', 'f', 'female', '여자'].includes(gVal)) {
+              gender = '여';
+            }
+            parts.pop();
+          }
+        }
+
+        // 3. Middle parts form the name
+        if (parts.length > 0) {
+          name = parts.join(" ");
+        } else {
+          name = number ? `학생${number}` : "무명";
+        }
+
+        // 4. Fill attendance number automatically
+        if (!number) {
+          number = String(defaultNumber++);
+        } else {
+          const parsedNum = parseInt(number);
+          if (!isNaN(parsedNum) && parsedNum >= defaultNumber) {
+            defaultNumber = parsedNum + 1;
+          }
+        }
+
+        parsed.push({ number, name, gender });
+      });
+
+      return parsed;
+    }
+
+    function processBulkRoster() {
+      const rawText = document.getElementById('roster-bulk-input').value;
+      if (!rawText.trim()) {
+        showToast("⚠️ 명단 입력란이 비어 있습니다.");
+        return;
+      }
+
+      rosterPreviewList = parseRosterText(rawText);
+      renderRosterPreviewTable();
+      showToast(`📝 ${rosterPreviewList.length}명의 명단이 추출되었습니다.`);
+    }
+
+    function clearBulkRosterInput() {
+      document.getElementById('roster-bulk-input').value = "";
+    }
+
+    function renderRosterPreviewTable() {
+      const tbody = document.getElementById('roster-table-body');
+      tbody.innerHTML = "";
+
+      document.getElementById('roster-preview-count').innerText = `총 ${rosterPreviewList.length}명`;
+
+      if (rosterPreviewList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#9ca3af; padding: 2rem;">등록된 학생이 없습니다. 명단을 입력해 주세요.</td></tr>`;
+        return;
+      }
+
+      rosterPreviewList.forEach((student, index) => {
+        const tr = document.createElement('tr');
+        
+        const tdNum = document.createElement('td');
+        tdNum.innerText = student.number;
+
+        const tdName = document.createElement('td');
+        tdName.style.fontWeight = "700";
+        tdName.innerText = student.name;
+
+        const tdGender = document.createElement('td');
+        const select = document.createElement('select');
+        select.style.padding = "0.2rem 0.5rem";
+        select.style.borderRadius = "0.25rem";
+        select.style.border = "1px solid var(--border-color)";
+        select.style.fontFamily = "inherit";
+        select.innerHTML = `
+          <option value="" ${student.gender === '' ? 'selected' : ''}>미지정</option>
+          <option value="남" ${student.gender === '남' ? 'selected' : ''}>남성 (♂)</option>
+          <option value="여" ${student.gender === '여' ? 'selected' : ''}>여성 (♀)</option>
+        `;
+        select.onchange = (e) => {
+          rosterPreviewList[index].gender = e.target.value;
+        };
+        tdGender.appendChild(select);
+
+        const tdDel = document.createElement('td');
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn-danger';
+        delBtn.style.padding = "0.25rem 0.5rem";
+        delBtn.style.fontSize = "0.8rem";
+        delBtn.innerText = "삭제";
+        delBtn.onclick = () => {
+          rosterPreviewList.splice(index, 1);
+          renderRosterPreviewTable();
+        };
+        tdDel.appendChild(delBtn);
+
+        tr.appendChild(tdNum);
+        tr.appendChild(tdName);
+        tr.appendChild(tdGender);
+        tr.appendChild(tdDel);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function saveRoster() {
+      activeRoster = JSON.parse(JSON.stringify(rosterPreviewList));
+      localStorage.setItem('team_maker_roster', JSON.stringify(activeRoster));
+      showToast("💾 학생 명단이 성공적으로 설정되었습니다!");
+      navigateHome();
+    }
+
+    function clearSavedRoster() {
+      if (confirm("등록 대기 중인 모든 학생을 지우시겠습니까?")) {
+        rosterPreviewList = [];
+        renderRosterPreviewTable();
+        document.getElementById('roster-bulk-input').value = "";
+      }
+    }
+
+    // ----------------------------------------------------
+    // Create Grouping Setup Wizard
+    // ----------------------------------------------------
+    function openSetupModal() {
+      // Guide user to set up roster if empty
+      if (activeRoster.length === 0) {
+        if (confirm("등록된 학생 명단이 없습니다.\n명단 관리 페이지로 이동하여 명단을 작성하시겠습니까?")) {
+          navigateRoster();
+        }
+        return;
+      }
+
+      document.getElementById('setup-title-input').value = "오늘의 조 편성";
+      document.getElementById('setup-criteria-value').value = 4;
+      document.getElementById('setup-modal').classList.add('show');
+    }
+
+    function closeSetupModal() {
+      document.getElementById('setup-modal').classList.remove('show');
+    }
+
+    function toggleSetupCriteriaInput() {
+      const mode = document.querySelector('input[name="setup-criteria"]:checked').value;
+      const label = document.getElementById('setup-criteria-label');
+      const helper = document.getElementById('setup-helper-text');
+      const valInput = document.getElementById('setup-criteria-value');
+
+      if (mode === 'team-count') {
+        label.innerText = "생성할 조 개수";
+        helper.innerText = "총 조 개수를 고정하여 조를 만듭니다.";
+        valInput.value = 4;
+      } else {
+        label.innerText = "조당 목표 인원수";
+        helper.innerText = `한 조에 배치할 학생 수 기준입니다. 학생 수(${activeRoster.length}명)에 맞춰 필요한 조 개수가 자동 산출됩니다.`;
+        valInput.value = 3;
+      }
+    }
+
+    function startGroupingWorkspace() {
+      const title = document.getElementById('setup-title-input').value.trim() || "새 조 편성";
+      const mode = document.querySelector('input[name="setup-criteria"]:checked').value;
+      const val = parseInt(document.getElementById('setup-criteria-value').value);
+
+      if (isNaN(val) || val < 1) {
+        showToast("⚠️ 올바른 값을 입력해 주세요.");
+        return;
+      }
+
+      let finalTeamCount = 4;
+      if (mode === 'team-count') {
+        finalTeamCount = val;
+      } else {
+        finalTeamCount = Math.ceil(activeRoster.length / val);
+      }
+
+      // Initialize workspace state
+      workspaceState = {
+        title: title,
+        waiting: JSON.parse(JSON.stringify(activeRoster)),
+        teams: []
+      };
+
+      for (let i = 1; i <= finalTeamCount; i++) {
+        workspaceState.teams.push({
+          name: `${i}조`,
+          members: []
+        });
+      }
+
+      closeSetupModal();
+      saveWorkspaceState();
+      navigateWorkspace();
+      showToast(`🍀 조 편성이 시작되었습니다. (${workspaceState.teams.length}개 조)`);
+    }
+
+    // ----------------------------------------------------
+    // Workspace logic & rendering
+    // ----------------------------------------------------
+    function saveWorkspaceState() {
+      localStorage.setItem('team_maker_workspace_ongoing', JSON.stringify(workspaceState));
+    }
+
+    function updateWorkspaceTitle(val) {
+      workspaceState.title = val;
+      saveWorkspaceState();
+    }
+
+    function renderWorkspace() {
+      // Sync Summary
+      const totalStudents = workspaceState.waiting.length + workspaceState.teams.reduce((acc, t) => acc + t.members.length, 0);
+      document.getElementById('workspace-summary').innerText = `총 ${totalStudents}명 · 조 ${workspaceState.teams.length}개`;
+
+      // Draw waiting list & A4 groups
+      renderWorkspaceWaiting();
+      renderWorkspaceTeams();
+    }
+
+    function renderWorkspaceWaiting() {
+      const container = document.getElementById('workspace-waiting-list');
+      container.innerHTML = "";
+
+      document.getElementById('workspace-waiting-count').innerText = `${workspaceState.waiting.length}명`;
+
+      if (workspaceState.waiting.length === 0) {
+        container.innerHTML = `<span style="color:#9ca3af; font-size:0.8rem; margin:auto; padding: 1rem 0;">대기 중인 학생이 없습니다.</span>`;
+        return;
+      }
+
+      workspaceState.waiting.forEach(student => {
+        const card = createWorkspaceStudentCard(student, 'waiting');
+        container.appendChild(card);
+      });
+    }
+
+    function renderWorkspaceTeams() {
+      const container = document.getElementById('workspace-teams-container');
+      container.innerHTML = "";
+
+      // Dynamic grid columns based on team count
+      container.classList.remove('cols-2', 'cols-3', 'cols-4');
+      const teamCount = workspaceState.teams.length;
+      if (teamCount <= 4) {
+        container.classList.add('cols-2');
+      } else if (teamCount <= 6) {
+        container.classList.add('cols-3');
+      } else {
+        container.classList.add('cols-4');
+      }
+
+      workspaceState.teams.forEach((team, index) => {
+        const teamCard = document.createElement('div');
+        teamCard.className = 'team-card';
+        if (selectedTeamIndex === index) {
+          teamCard.classList.add('selected-team');
+        }
+        teamCard.id = `team-card-${index}`;
+        teamCard.setAttribute('ondragover', 'allowDrop(event)');
+        teamCard.setAttribute('ondragleave', 'handleDragLeave(event)');
+        teamCard.setAttribute('ondrop', `dropToTeam(event, ${index})`);
+        teamCard.setAttribute('onclick', `handleTeamClick(${index})`);
+
+        // Team Header
+        const header = document.createElement('div');
+        header.className = 'team-header';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'team-name-input';
+        nameInput.value = team.name;
+        nameInput.onclick = (e) => e.stopPropagation();
+        nameInput.onchange = (e) => {
+          team.name = e.target.value;
+          saveWorkspaceState();
+        };
+
+        const countBadge = document.createElement('span');
+        countBadge.className = 'team-count';
+        
+        const males = team.members.filter(m => m.gender === '남').length;
+        const females = team.members.filter(m => m.gender === '여').length;
+        
+        let dots = "";
+        if (males > 0) dots += `<span class="gender-count-dot male" title="남학생 ${males}명"></span>`;
+        if (females > 0) dots += `<span class="gender-count-dot female" title="여학생 ${females}명"></span>`;
+
+        countBadge.innerHTML = `${dots} ${team.members.length}명`;
+
+
+
+        header.appendChild(nameInput);
+        header.appendChild(countBadge);
+        teamCard.appendChild(header);
+
+        // Dropzone
+        const dropzone = document.createElement('div');
+        dropzone.className = 'team-dropzone';
+
+        if (team.members.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'team-empty-state';
+          empty.innerText = "이곳에 배치";
+          dropzone.appendChild(empty);
+        } else {
+          team.members.forEach(student => {
+            const card = createWorkspaceStudentCard(student, index);
+            dropzone.appendChild(card);
+          });
+        }
+
+        teamCard.appendChild(dropzone);
+        container.appendChild(teamCard);
+      });
+    }
+
+    function createWorkspaceStudentCard(student, source) {
+      const card = document.createElement('div');
+      
+      let genderClass = 'gender-none';
+      let genderSymbol = '';
+      if (student.gender === '남') {
+        genderClass = 'gender-male';
+        genderSymbol = '♂';
+      } else if (student.gender === '여') {
+        genderClass = 'gender-female';
+        genderSymbol = '♀';
+      }
+
+      card.className = `student-card ${genderClass}`;
+      card.draggable = true;
+
+      // Number badge
+      const numSpan = document.createElement('span');
+      numSpan.className = 'student-num-badge';
+      numSpan.innerText = student.number;
+      card.appendChild(numSpan);
+
+      // Name span
+      const nameSpan = document.createElement('span');
+      nameSpan.innerText = student.name;
+      nameSpan.style.marginLeft = "0.25rem";
+      card.appendChild(nameSpan);
+
+      // Highlight selected card
+      if (selectedStudent && selectedStudent.number === student.number && selectedStudent.name === student.name && selectedStudent.source === source) {
+        card.classList.add('selected');
+      }
+
+      // HTML5 Drag
+      card.addEventListener('dragstart', (e) => {
+        card.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', JSON.stringify({ student, source }));
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        document.querySelectorAll('.team-card, .waiting-list-container').forEach(el => {
+          el.classList.remove('dragover');
+        });
+      });
+
+      // Selection click
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (selectedTeamIndex !== null) {
+          if (source === selectedTeamIndex) {
+            removeStudentFromTeam(student, source);
+          } else {
+            moveStudent(student, source, selectedTeamIndex);
+          }
+          renderWorkspace();
+        } else {
+          if (selectedStudent && selectedStudent.number === student.number && selectedStudent.name === student.name && selectedStudent.source === source) {
+            selectedStudent = null;
+          } else {
+            selectedStudent = { ...student, source };
+          }
+          renderWorkspace();
+        }
+      });
+
+      // Remove from team button
+      if (source !== 'waiting') {
+        const removeBtn = document.createElement('span');
+        removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '&times;';
+        removeBtn.onclick = (e) => {
+          e.stopPropagation();
+          removeStudentFromTeam(student, source);
+        };
+        card.appendChild(removeBtn);
+      }
+
+      return card;
+    }
+
+    function removeStudentFromTeam(student, teamIndex) {
+      workspaceState.teams[teamIndex].members = workspaceState.teams[teamIndex].members.filter(m => m.number !== student.number || m.name !== student.name);
+
+      const exists = workspaceState.waiting.some(w => w.number === student.number && w.name === student.name);
+      if (!exists) {
+        workspaceState.waiting.push(student);
+      }
+      workspaceState.waiting.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+
+      if (selectedStudent && selectedStudent.number === student.number && selectedStudent.source === teamIndex) {
+        selectedStudent = null;
+      }
+
+      saveWorkspaceState();
+      renderWorkspace();
+    }
+
+    // Drag events
+    function allowDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('dragover');
+    }
+
+    function handleDragLeave(e) {
+      e.currentTarget.classList.remove('dragover');
+    }
+
+    function dropToTeam(e, teamIndex) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+
+      try {
+        const raw = e.dataTransfer.getData('text/plain');
+        if (!raw) return;
+        const dragData = JSON.parse(raw);
+        moveStudent(dragData.student, dragData.source, teamIndex);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function dropToWaiting(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+
+      try {
+        const raw = e.dataTransfer.getData('text/plain');
+        if (!raw) return;
+        const dragData = JSON.parse(raw);
+
+        if (dragData.source !== 'waiting') {
+          // Remove from team
+          workspaceState.teams[dragData.source].members = workspaceState.teams[dragData.source].members.filter(m => m.number !== dragData.student.number || m.name !== dragData.student.name);
+          // Add to waiting
+          const exists = workspaceState.waiting.some(w => w.number === dragData.student.number && w.name === dragData.student.name);
+          if (!exists) {
+            workspaceState.waiting.push(dragData.student);
+          }
+          workspaceState.waiting.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+
+          saveWorkspaceState();
+          renderWorkspace();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Click assignment / Team selection
+    function handleTeamClick(teamIndex) {
+      if (selectedStudent) {
+        moveStudent({ number: selectedStudent.number, name: selectedStudent.name, gender: selectedStudent.gender }, selectedStudent.source, teamIndex);
+        selectedStudent = null;
+        renderWorkspace();
+      } else {
+        if (selectedTeamIndex === teamIndex) {
+          selectedTeamIndex = null;
+        } else {
+          selectedTeamIndex = teamIndex;
+        }
+        renderWorkspace();
+      }
+    }
+
+    // Click on background of waiting area returns selected back to waiting
+    // Click on background of waiting area returns selected back to waiting / clears selections
+    document.addEventListener('click', (e) => {
+      // 1. Handle student selection clearing
+      if (selectedStudent) {
+        const waitingPanel = document.getElementById('workspace-waiting-list').closest('.canvas-card');
+        if (waitingPanel && waitingPanel.contains(e.target)) {
+          if (selectedStudent.source !== 'waiting') {
+            const st = { number: selectedStudent.number, name: selectedStudent.name, gender: selectedStudent.gender };
+            workspaceState.teams[selectedStudent.source].members = workspaceState.teams[selectedStudent.source].members.filter(m => m.number !== st.number || m.name !== st.name);
+            
+            const exists = workspaceState.waiting.some(w => w.number === st.number && w.name === st.name);
+            if (!exists) {
+              workspaceState.waiting.push(st);
+            }
+            workspaceState.waiting.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+            saveWorkspaceState();
+          }
+          selectedStudent = null;
+          renderWorkspace();
+          return;
+        }
+      }
+
+      // 2. Handle team selection clearing
+      if (selectedTeamIndex !== null) {
+        const workspaceView = document.getElementById('workspace-view');
+        const isTeamCard = e.target.closest('.team-card');
+        const isStudentCard = e.target.closest('.student-card');
+        const isTeamInput = e.target.closest('.team-name-input');
+        if (workspaceView && !workspaceView.classList.contains('hidden') && !isTeamCard && !isStudentCard && !isTeamInput) {
+          selectedTeamIndex = null;
+          renderWorkspace();
+        }
+      }
+    });
+
+    function moveStudent(student, source, targetTeamIndex) {
+      if (source === 'waiting') {
+        workspaceState.waiting = workspaceState.waiting.filter(m => m.number !== student.number || m.name !== student.name);
+      } else {
+        workspaceState.teams[source].members = workspaceState.teams[source].members.filter(m => m.number !== student.number || m.name !== student.name);
+      }
+
+      const exists = workspaceState.teams[targetTeamIndex].members.some(m => m.number === student.number && m.name === student.name);
+      if (!exists) {
+        workspaceState.teams[targetTeamIndex].members.push(student);
+      }
+
+      saveWorkspaceState();
+      renderWorkspace();
+    }
+
+    function clearWorkspaceTeamsOnly() {
+      if (workspaceState.teams.every(t => t.members.length === 0)) return;
+
+      workspaceState.teams.forEach(team => {
+        team.members.forEach(member => {
+          const exists = workspaceState.waiting.some(w => w.number === member.number && w.name === member.name);
+          if (!exists) {
+            workspaceState.waiting.push(member);
+          }
+        });
+        team.members = [];
+      });
+
+      workspaceState.waiting.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+      selectedStudent = null;
+      showToast("🧹 모든 조가 비워졌습니다.");
+      saveWorkspaceState();
+      renderWorkspace();
+    }
+
+    function randomlyAssignAll() {
+      if (workspaceState.waiting.length === 0) {
+        showToast("⚠️ 대기 중인 학생이 없습니다.");
+        return;
+      }
+
+      let shuffle = [...workspaceState.waiting];
+      for (let i = shuffle.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffle[i], shuffle[j]] = [shuffle[j], shuffle[i]];
+      }
+
+      shuffle.forEach(student => {
+        // Find team with minimum size
+        let minIndex = 0;
+        let minSize = workspaceState.teams[0].members.length;
+        
+        for (let i = 1; i < workspaceState.teams.length; i++) {
+          if (workspaceState.teams[i].members.length < minSize) {
+            minSize = workspaceState.teams[i].members.length;
+            minIndex = i;
+          }
+        }
+        workspaceState.teams[minIndex].members.push(student);
+      });
+
+      workspaceState.waiting = [];
+      selectedStudent = null;
+
+      showToast("🎲 무작위 자동 배치가 완료되었습니다!");
+      saveWorkspaceState();
+      renderWorkspace();
+    }
+
+    // ----------------------------------------------------
+    // Permanent Data Storage
+    // ----------------------------------------------------
+    function saveCurrentWorkspaceConfig() {
+      const userTitle = prompt("저장할 조 편성 명칭을 입력하세요:", workspaceState.title);
+      if (userTitle === null) return;
+
+      const configName = userTitle.trim() || workspaceState.title || "새 조 편성";
+
+      const newConfig = {
+        id: 'config_' + Date.now(),
+        savedAt: new Date().toLocaleString('ko-KR'),
+        title: configName,
+        waiting: [...workspaceState.waiting],
+        teams: JSON.parse(JSON.stringify(workspaceState.teams))
+      };
+
+      savedConfigs.unshift(newConfig);
+      localStorage.setItem('team_maker_saved_configs', JSON.stringify(savedConfigs));
+
+      workspaceState.title = configName;
+      document.getElementById('workspace-title').value = configName;
+      saveWorkspaceState();
+
+      showToast(`💾 "${configName}" 편성이 목록에 저장되었습니다.`);
+    }
+
+    function openSavedModal() {
+      const modal = document.getElementById('saved-modal');
+      const listContainer = document.getElementById('saved-list');
+      listContainer.innerHTML = "";
+
+      if (savedConfigs.length === 0) {
+        listContainer.innerHTML = `<p style="color:#9ca3af; text-align:center; padding: 2rem 0;">저장된 조 편성이 없습니다.</p>`;
+      } else {
+        savedConfigs.forEach(cfg => {
+          const item = document.createElement('div');
+          item.className = 'saved-item';
+
+          const info = document.createElement('div');
+          info.className = 'saved-item-info';
+          info.onclick = () => loadConfig(cfg.id);
+
+          const title = document.createElement('div');
+          title.className = 'saved-item-title';
+          title.innerText = cfg.title;
+
+          const meta = document.createElement('div');
+          meta.className = 'saved-item-meta';
+          const totalCount = cfg.waiting.length + cfg.teams.reduce((acc, t) => acc + t.members.length, 0);
+          meta.innerText = `${cfg.savedAt} · 조 ${cfg.teams.length}개 · 총 ${totalCount}명`;
+
+          info.appendChild(title);
+          info.appendChild(meta);
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'btn-danger btn-icon-only';
+          delBtn.innerHTML = '🗑️';
+          delBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteConfig(cfg.id, cfg.title);
+          };
+
+          item.appendChild(info);
+          item.appendChild(delBtn);
+          listContainer.appendChild(item);
+        });
+      }
+
+      modal.classList.add('show');
+    }
+
+    function closeSavedModal() {
+      document.getElementById('saved-modal').classList.remove('show');
+    }
+
+    function loadConfig(id) {
+      const target = savedConfigs.find(c => c.id === id);
+      if (!target) return;
+
+      if (confirm(`"${target.title}" 조 편성을 불러오시겠습니까?\n기존 작업판의 내용은 덮어씌워집니다.`)) {
+        workspaceState = {
+          title: target.title,
+          waiting: [...target.waiting],
+          teams: JSON.parse(JSON.stringify(target.teams))
+        };
+
+        saveWorkspaceState();
+        closeSavedModal();
+        navigateWorkspace();
+        showToast(`📂 "${target.title}" 편성을 불러왔습니다.`);
+      }
+    }
+
+    function deleteConfig(id, title) {
+      if (!confirm(`"${title}" 편성을 영구 삭제하시겠습니까?`)) return;
+
+      savedConfigs = savedConfigs.filter(c => c.id !== id);
+      localStorage.setItem('team_maker_saved_configs', JSON.stringify(savedConfigs));
+
+      showToast("🗑️ 삭제 완료");
+      openSavedModal();
+    }
+
+    // ----------------------------------------------------
+    // PDF Generation
+    // ----------------------------------------------------
+    function downloadPDF() {
+      const printTemplate = document.getElementById('a4-print-template');
+      printTemplate.innerHTML = "";
+
+      const originalSheet = document.getElementById('workspace-a4-sheet');
+      if (!originalSheet) {
+        showToast("❌ 조 편성 화면을 찾을 수 없습니다.");
+        return;
+      }
+
+      // 1. Clone the on-screen A4 sheet exactly as user sees it
+      const sheetClone = originalSheet.cloneNode(true);
+      sheetClone.removeAttribute('id');
+
+      // Strip selection UI elements from PDF clone
+      sheetClone.querySelectorAll('.selected-team').forEach(card => {
+        card.classList.remove('selected-team');
+      });
+
+      // Match the exact same styling as the on-screen A4 sheet
+      sheetClone.style.cssText = `
+        background: #ffffff;
+        width: 210mm;
+        min-height: 297mm;
+        padding: 5mm 10mm 8mm 10mm;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        box-shadow: none;
+        border: none;
+        margin: 0;
+        position: relative;
+      `;
+
+      // 2. Replace title input with static text
+      const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
+      const titleInput = sheetClone.querySelector('.a4-sheet-title-input');
+      if (titleInput) {
+        const titleDiv = document.createElement('div');
+        titleDiv.innerText = titleVal;
+        titleDiv.style.cssText = `
+          font-size: 1.6rem; font-weight: 800; color: #047857;
+          text-align: center; margin-bottom: 0.5rem;
+          font-family: 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+        `;
+        titleInput.parentNode.replaceChild(titleDiv, titleInput);
+      }
+
+      // 3. Replace team name inputs with static text
+      const clonedTeamInputs = sheetClone.querySelectorAll('.team-name-input');
+      const realTeamInputs = document.querySelectorAll('.team-name-input');
+      clonedTeamInputs.forEach((input, idx) => {
+        const val = realTeamInputs[idx] ? realTeamInputs[idx].value.trim() : input.value.trim();
+        const span = document.createElement('span');
+        span.innerText = val;
+        span.style.cssText = `font-size: 0.9rem; font-weight: 800; color: #047857;`;
+        input.parentNode.replaceChild(span, input);
+      });
+
+      // 4. Remove interactive elements
+      sheetClone.querySelectorAll('.remove-btn').forEach(btn => btn.remove());
+      sheetClone.querySelectorAll('.team-empty-state').forEach(el => {
+        el.innerText = '';
+        el.style.padding = '0';
+      });
+
+      // 5. Add print footer
+      const footer = document.createElement('div');
+      footer.style.cssText = `
+        display: flex; justify-content: space-between;
+        font-size: 8px; color: #9ca3af;
+        border-top: 1px solid #e5e7eb;
+        padding-top: 5px; margin-top: auto;
+        flex-shrink: 0; width: 100%;
+      `;
+      footer.innerHTML = '<span>오늘의 조 편성</span><span>' +
+        new Date().toLocaleDateString('ko-KR') + ' ' +
+        new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) +
+        '</span>';
+      sheetClone.appendChild(footer);
+
+      // 6. Offscreen placement for measurement
+      printTemplate.style.cssText = 'position:absolute; left:-9999px; top:0; width:210mm; overflow:visible;';
+      printTemplate.appendChild(sheetClone);
+
+      showToast("💾 PDF 생성 중...");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const sheetW = sheetClone.offsetWidth;
+          const sheetH = sheetClone.scrollHeight;
+          const a4H = sheetW * (297 / 210);
+
+          let scale = 1;
+          if (sheetH > a4H) {
+            scale = a4H / sheetH;
+          }
+
+          const wrapper = document.createElement('div');
+          wrapper.style.cssText = 'width:210mm; height:297mm; overflow:hidden; background:#fff; position:relative;';
+
+          printTemplate.removeChild(sheetClone);
+
+          if (scale < 1) {
+            sheetClone.style.transformOrigin = 'top left';
+            sheetClone.style.transform = 'scale(' + scale + ')';
+            sheetClone.style.width = (100 / scale) + '%';
+          }
+          // No minHeight – let content sit naturally within wrapper, wrapper clips to A4
+          sheetClone.style.minHeight = 'auto';
+          sheetClone.style.height = 'auto';
+
+          wrapper.appendChild(sheetClone);
+          printTemplate.innerHTML = '';
+          printTemplate.appendChild(wrapper);
+
+          // Capture exactly the wrapper dimensions (210mm x 297mm) – 1 page only
+          var wrapperW = wrapper.offsetWidth;
+          var wrapperH = wrapper.offsetHeight;
+
+          html2pdf().from(wrapper).set({
+            margin: 0,
+            filename: titleVal + '.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false, width: wrapperW, height: wrapperH },
+            jsPDF: { unit: 'px', format: [wrapperW * 2, wrapperH * 2], orientation: 'portrait', hotfixes: ['px_scaling'] }
+          }).save().then(function() {
+            printTemplate.innerHTML = '';
+            showToast("✅ PDF 다운로드 완료!");
+          }).catch(function(err) {
+            console.error("PDF 에러:", err);
+            showToast("❌ PDF 변환 실패. Ctrl+P 인쇄를 이용해 주세요.");
+          });
+        });
+      });
+    }
+  </script>
+</body>
+</html>
