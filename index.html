@@ -2151,8 +2151,9 @@
       const a4H = sheetW * (297 / 210);
 
       let scale = 1;
-      if (sheetH > a4H) {
-        scale = a4H / sheetH;
+      // Apply a safe 8px buffer if close to or exceeding A4 height to prevent blank 2nd page
+      if (sheetH >= a4H - 5) {
+        scale = (a4H - 8) / sheetH;
       }
 
       // Apply temporary scaling to force exactly 1 A4 page
@@ -2181,7 +2182,8 @@
           unit: 'mm', 
           format: 'a4', 
           orientation: 'portrait' 
-        }
+        },
+        pagebreak: { mode: 'avoid-all' }
       }).save().then(function() {
         // 3. Restore all elements and styles immediately after save
         removeBtns.forEach(btn => btn.style.display = '');
