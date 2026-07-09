@@ -594,6 +594,7 @@
       box-shadow: var(--shadow-sm);
       transition: var(--transition);
       flex-shrink: 0;
+      position: relative;
     }
     
     /* Gender classes */
@@ -655,6 +656,10 @@
       border-radius: 50%;
       font-size: 0.75rem;
       transition: var(--transition);
+      position: absolute;
+      right: 0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
     }
     .student-card .remove-btn:hover {
       background-color: #fee2e2;
@@ -752,7 +757,7 @@
     }
     .team-dropzone .student-card {
       width: 100% !important;
-      justify-content: space-between;
+      justify-content: center;
     }
 
     .team-empty-state {
