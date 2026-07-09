@@ -2138,9 +2138,30 @@
       emptyStates.forEach(el => { el.dataset.origText = el.innerText; el.innerText = ''; el.style.padding = '0'; });
       selectedCards.forEach(card => card.classList.remove('selected-team'));
 
-      // Remove box-shadow and border temporarily for clean capture
+      // Keep backup of original styles to restore later
       const origBoxShadow = sheet.style.boxShadow;
       const origBorder = sheet.style.border;
+      const origTransform = sheet.style.transform;
+      const origTransformOrigin = sheet.style.transformOrigin;
+      const origWidth = sheet.style.width;
+
+      // Measure sheet dimensions to calculate scale-to-fit
+      const sheetW = sheet.offsetWidth;
+      const sheetH = sheet.scrollHeight;
+      const a4H = sheetW * (297 / 210);
+
+      let scale = 1;
+      if (sheetH > a4H) {
+        scale = a4H / sheetH;
+      }
+
+      // Apply temporary scaling to force exactly 1 A4 page
+      if (scale < 1) {
+        sheet.style.transformOrigin = 'top left';
+        sheet.style.transform = 'scale(' + scale + ')';
+        sheet.style.width = (100 / scale) + '%';
+      }
+
       sheet.style.boxShadow = 'none';
       sheet.style.border = 'none';
 
@@ -2162,10 +2183,14 @@
           orientation: 'portrait' 
         }
       }).save().then(function() {
-        // 3. Restore all hidden elements immediately
+        // 3. Restore all elements and styles immediately after save
         removeBtns.forEach(btn => btn.style.display = '');
         emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
         selectedCards.forEach(card => card.classList.add('selected-team'));
+        
+        sheet.style.transform = origTransform;
+        sheet.style.transformOrigin = origTransformOrigin;
+        sheet.style.width = origWidth;
         sheet.style.boxShadow = origBoxShadow;
         sheet.style.border = origBorder;
 
@@ -2175,6 +2200,10 @@
         removeBtns.forEach(btn => btn.style.display = '');
         emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
         selectedCards.forEach(card => card.classList.add('selected-team'));
+        
+        sheet.style.transform = origTransform;
+        sheet.style.transformOrigin = origTransformOrigin;
+        sheet.style.width = origWidth;
         sheet.style.boxShadow = origBoxShadow;
         sheet.style.border = origBorder;
 
