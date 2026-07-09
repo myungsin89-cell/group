@@ -2145,72 +2145,63 @@
       const origTransformOrigin = sheet.style.transformOrigin;
       const origWidth = sheet.style.width;
 
-      // Measure sheet dimensions to calculate scale-to-fit
-      const sheetW = sheet.offsetWidth;
-      const sheetH = sheet.scrollHeight;
-      const a4H = sheetW * (297 / 210);
+      // 2. Capture the actual on-screen A4 sheet directly using html2canvas
+      requestAnimationFrame(() => {
+        html2canvas(sheet, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        }).then(function(canvas) {
+          // 3. Restore all elements and styles immediately after capture
+          removeBtns.forEach(btn => btn.style.display = '');
+          emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
+          selectedCards.forEach(card => card.classList.add('selected-team'));
+          
+          sheet.style.transform = origTransform;
+          sheet.style.transformOrigin = origTransformOrigin;
+          sheet.style.width = origWidth;
+          sheet.style.boxShadow = origBoxShadow;
+          sheet.style.border = origBorder;
 
-      let scale = 1;
-      // Apply a safe 8px buffer if close to or exceeding A4 height to prevent blank 2nd page
-      if (sheetH >= a4H - 5) {
-        scale = (a4H - 8) / sheetH;
-      }
+          // 4. Resolve the jsPDF constructor from the loaded html2pdf bundle
+          let jsPDFConstructor = null;
+          if (typeof window.jsPDF === 'function') {
+            jsPDFConstructor = window.jsPDF;
+          } else if (window.jspdf && typeof window.jspdf.jsPDF === 'function') {
+            jsPDFConstructor = window.jspdf.jsPDF;
+          } else {
+            throw new Error("jsPDF constructor not found in loaded bundle.");
+          }
 
-      // Apply temporary scaling to force exactly 1 A4 page
-      if (scale < 1) {
-        sheet.style.transformOrigin = 'top left';
-        sheet.style.transform = 'scale(' + scale + ')';
-        sheet.style.width = (100 / scale) + '%';
-      }
+          // 5. Create a single A4 page document
+          const pdf = new jsPDFConstructor({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+          });
 
-      sheet.style.boxShadow = 'none';
-      sheet.style.border = 'none';
+          // 6. Draw the entire canvas exactly fitted to the 210mm x 297mm page (Strictly 1 Page)
+          const imgData = canvas.toDataURL('image/jpeg', 0.95);
+          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+          pdf.save(titleVal + '.pdf');
 
-      const titleVal = document.getElementById('workspace-title').value.trim() || '오늘의 조 편성';
+          showToast("✅ PDF 다운로드 완료!");
+        }).catch(function(err) {
+          // Restore on error too
+          removeBtns.forEach(btn => btn.style.display = '');
+          emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
+          selectedCards.forEach(card => card.classList.add('selected-team'));
+          
+          sheet.style.transform = origTransform;
+          sheet.style.transformOrigin = origTransformOrigin;
+          sheet.style.width = origWidth;
+          sheet.style.boxShadow = origBoxShadow;
+          sheet.style.border = origBorder;
 
-      // 2. Capture the actual on-screen A4 sheet directly using html2pdf
-      html2pdf().from(sheet).set({
-        margin: 0,
-        filename: titleVal + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          logging: false 
-        },
-        jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'portrait' 
-        },
-        pagebreak: { mode: 'avoid-all' }
-      }).save().then(function() {
-        // 3. Restore all elements and styles immediately after save
-        removeBtns.forEach(btn => btn.style.display = '');
-        emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
-        selectedCards.forEach(card => card.classList.add('selected-team'));
-        
-        sheet.style.transform = origTransform;
-        sheet.style.transformOrigin = origTransformOrigin;
-        sheet.style.width = origWidth;
-        sheet.style.boxShadow = origBoxShadow;
-        sheet.style.border = origBorder;
-
-        showToast("✅ PDF 다운로드 완료!");
-      }).catch(function(err) {
-        // Restore on error too
-        removeBtns.forEach(btn => btn.style.display = '');
-        emptyStates.forEach(el => { el.innerText = el.dataset.origText || '이곳에 배치'; el.style.padding = ''; });
-        selectedCards.forEach(card => card.classList.add('selected-team'));
-        
-        sheet.style.transform = origTransform;
-        sheet.style.transformOrigin = origTransformOrigin;
-        sheet.style.width = origWidth;
-        sheet.style.boxShadow = origBoxShadow;
-        sheet.style.border = origBorder;
-
-        console.error("PDF 에러:", err);
-        showToast("❌ PDF 변환 실패. Ctrl+P 인쇄를 이용해 주세요.");
+          console.error("PDF 에러:", err);
+          showToast("❌ PDF 변환 실패. Ctrl+P 인쇄를 이용해 주세요.");
+        });
       });
     }
   </script>
